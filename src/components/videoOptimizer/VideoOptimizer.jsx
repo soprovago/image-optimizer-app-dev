@@ -89,25 +89,19 @@ const VideoOptimizer = () => {
   const initializeFFmpeg = async () => {
       try {
         setFfmpegLoading(true);
-        ffmpegRef.current = new FFmpeg({ 
+        ffmpegRef.current = new FFmpeg({
           log: true,
           progress: ({ ratio }) => {
             if (ratio < 0 || ratio > 1) return;
             setProgress(Math.floor(ratio * 100));
           },
-          corePath: 'https://unpkg.com/@ffmpeg/core/dist/ffmpeg-core.js',
+          corePath: '/ffmpeg/ffmpeg-core.js',
+          workerPath: '/ffmpeg/ffmpeg-core.worker.js',
+          wasmPath: '/ffmpeg/ffmpeg-core.wasm', 
+          loadTimeout: 60000,
           logger: ({ message }) => {
             console.log(`[FFmpeg] ${message}`);
           },
-          // CORS configuration
-          fetchOptions: {
-            mode: 'cors',
-            credentials: 'omit',
-            headers: {
-              'Cross-Origin-Embedder-Policy': 'require-corp',
-              'Cross-Origin-Opener-Policy': 'same-origin'
-            }
-          }
         });
         
         console.log('Loading FFmpeg...');
