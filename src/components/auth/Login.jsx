@@ -35,7 +35,7 @@ const Login = () => {
   };
 
   return (
-    <AuthLayout title="Iniciar sesión en la plataforma" error={error}>
+    <AuthLayout title="Iniciar sesión en la suite de wemax" error={error}>
       <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
         <TextField
           margin="normal"

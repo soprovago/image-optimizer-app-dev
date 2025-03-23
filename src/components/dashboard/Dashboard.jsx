@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Routes, Route, useLocation } from 'react-router-dom';
+import weSuiteLogo from '../../assets/we_suite.svg';
+import Home from './Home';
 import {
   Box,
   AppBar,
@@ -25,9 +27,13 @@ import {
   PhotoCamera as ImageIcon,
   Logout as LogoutIcon
 } from '@mui/icons-material';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import VideoFileIcon from '@mui/icons-material/VideoFile';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme as useAppTheme } from '../../contexts/ThemeContext';
 import ImageOptimizer from '../imageOptimizer/ImageOptimizer';
+import PdfOptimizer from '../pdfOptimizer/PdfOptimizer';
+import VideoOptimizer from '../videoOptimizer/VideoOptimizer';
 
 const drawerWidth = 240;
 
@@ -37,6 +43,7 @@ const Dashboard = () => {
   const { isDarkMode, toggleTheme } = useAppTheme();
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const handleDrawerToggle = () => {
@@ -51,18 +58,45 @@ const Dashboard = () => {
       console.error('Failed to log out:', error);
     }
   };
-
+  
+  const navigateToHome = () => {
+    navigate('/dashboard');
+    if (isMobile) setMobileOpen(false);
+  };
+  
+  const navigateToImageOptimizer = () => {
+    navigate('/dashboard/optimize');
+    if (isMobile) setMobileOpen(false);
+  };
+  
+  const navigateToPdfOptimizer = () => {
+    navigate('/dashboard/pdf');
+    if (isMobile) setMobileOpen(false);
+  };
+  
+  const navigateToVideoOptimizer = () => {
+    navigate('/dashboard/video');
+    if (isMobile) setMobileOpen(false);
+  };
   const drawerContent = (
     <Box>
       <Toolbar>
-        <Typography variant="h6" noWrap>
-          Image Optimizer
-        </Typography>
+        <img 
+          src={weSuiteLogo} 
+          alt="WE Suite Logo" 
+          style={{ 
+            height: '45px',
+            maxWidth: '100%',
+            objectFit: 'contain'
+          }} 
+        />
       </Toolbar>
       <Divider />
       <List>
         <ListItem disablePadding>
-          <ListItemButton>
+          <ListItemButton 
+            onClick={navigateToHome}
+            selected={location.pathname === '/dashboard'}>
             <ListItemIcon>
               <HomeIcon />
             </ListItemIcon>
@@ -70,11 +104,33 @@ const Dashboard = () => {
           </ListItemButton>
         </ListItem>
         <ListItem disablePadding>
-          <ListItemButton>
+          <ListItemButton 
+            onClick={navigateToImageOptimizer}
+            selected={location.pathname === '/dashboard/optimize'}>
             <ListItemIcon>
               <ImageIcon />
             </ListItemIcon>
             <ListItemText primary="Optimize Images" />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemButton
+            onClick={navigateToPdfOptimizer}
+            selected={location.pathname === '/dashboard/pdf'}>
+            <ListItemIcon>
+              <PictureAsPdfIcon />
+            </ListItemIcon>
+            <ListItemText primary="Optimizar PDF" />
+          </ListItemButton>
+        </ListItem>
+        <ListItem disablePadding>
+          <ListItemButton
+            onClick={navigateToVideoOptimizer}
+            selected={location.pathname === '/dashboard/video'}>
+            <ListItemIcon>
+              <VideoFileIcon />
+            </ListItemIcon>
+            <ListItemText primary="Optimizar Video" />
           </ListItemButton>
         </ListItem>
       </List>
@@ -111,7 +167,7 @@ const Dashboard = () => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Welcome, {currentUser?.displayName || 'User'}
+            ¡Hola! {currentUser?.displayName || 'User'}
           </Typography>
           <IconButton color="inherit" onClick={toggleTheme}>
             {isDarkMode ? <LightModeIcon /> : <DarkModeIcon />}
@@ -152,7 +208,12 @@ const Dashboard = () => {
         }}
       >
         <Toolbar /> {/* Add space for the AppBar */}
-        <ImageOptimizer />
+        <Routes>
+          <Route path="" element={<Home />} />
+          <Route path="optimize" element={<ImageOptimizer />} />
+          <Route path="pdf" element={<PdfOptimizer />} />
+          <Route path="video" element={<VideoOptimizer />} />
+        </Routes>
       </Box>
     </Box>
   );

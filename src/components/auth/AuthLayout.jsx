@@ -42,6 +42,7 @@ const AuthLayout = ({ title, error, children }) => {
             display: 'flex', 
             justifyContent: 'center',
             padding: '0 16px',
+            mt: '-50px'  // Add negative margin-top to move the form up
           }}>
           <Box
             sx={{
