@@ -9,27 +9,30 @@ import VideoFileIcon from '@mui/icons-material/VideoFile';
 // Styled components
 const WelcomeBanner = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(4),
-  margin: `0 ${theme.spacing(0)}`,
   marginBottom: theme.spacing(4),
   background: `linear-gradient(45deg, ${theme.palette.primary.main} 30%, ${theme.palette.primary.dark} 90%)`,
   color: theme.palette.primary.contrastText,
-  borderRadius: 4,
+  borderRadius: theme.shape.borderRadius,
   boxShadow: theme.shadows[3],
-  width: `calc(100% + ${theme.spacing(6)})`,
 }));
 
 const ToolCard = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
   height: '100%',
+  minHeight: 340,
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
+  justifyContent: 'space-between',
   textAlign: 'center',
   transition: 'transform 0.3s ease, box-shadow 0.3s ease',
   cursor: 'pointer',
   '&:hover': {
     transform: 'translateY(-8px)',
     boxShadow: theme.shadows[8],
+  },
+  '& .MuiTypography-body2': {
+    margin: theme.spacing(2, 0),
   },
 }));
 
@@ -70,7 +73,7 @@ const Home = () => {
           Herramientas disponibles
         </Typography>
         
-        <Grid container spacing={4}>
+        <Grid container spacing={4} justifyContent="center" alignItems="stretch">
           {/* Image Optimizer Tool Card */}
           <Grid item xs={12} sm={6} md={4}>
             <ToolCard 
@@ -80,7 +83,15 @@ const Home = () => {
                 cursor: 'pointer'
               }}
             >
-              <IconContainer>
+              <IconContainer sx={{
+                backgroundColor: (theme) => theme.palette.primary.light,
+                width: (theme) => theme.spacing(8),
+                height: (theme) => theme.spacing(8),
+                mb: 3,
+                '& > svg': {
+                  fontSize: '2.5rem',
+                }
+              }}>
                 <ImageIcon fontSize="large" />
               </IconContainer>
               <Typography variant="h6" component="h3" gutterBottom>
@@ -108,7 +119,15 @@ const Home = () => {
                 cursor: 'pointer'
               }}
             >
-              <IconContainer>
+              <IconContainer sx={{
+                backgroundColor: (theme) => theme.palette.primary.light,
+                width: (theme) => theme.spacing(8),
+                height: (theme) => theme.spacing(8),
+                mb: 3,
+                '& > svg': {
+                  fontSize: '2.5rem',
+                }
+              }}>
                 <PictureAsPdfIcon fontSize="large" />
               </IconContainer>
               <Typography variant="h6" component="h3" gutterBottom>
@@ -136,7 +155,15 @@ const Home = () => {
                 cursor: 'pointer'
               }}
             >
-              <IconContainer>
+              <IconContainer sx={{
+                backgroundColor: (theme) => theme.palette.primary.light,
+                width: (theme) => theme.spacing(8),
+                height: (theme) => theme.spacing(8),
+                mb: 3,
+                '& > svg': {
+                  fontSize: '2.5rem',
+                }
+              }}>
                 <VideoFileIcon fontSize="large" />
               </IconContainer>
               <Typography variant="h6" component="h3" gutterBottom>
