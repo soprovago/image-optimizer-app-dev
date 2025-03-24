@@ -6,7 +6,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "default-src 'self'; font-src 'self' data: 'unsafe-inline'; style-src 'self' 'unsafe-inline';"
+            value: "default-src 'self';script-src 'self' 'unsafe-inline' 'unsafe-eval';style-src 'self' 'unsafe-inline';font-src 'self' data: https: http:;img-src 'self' data: blob:;connect-src 'self'"
           }
         ]
       }
