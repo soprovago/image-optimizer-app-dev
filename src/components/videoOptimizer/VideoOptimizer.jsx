@@ -89,57 +89,56 @@ const VideoOptimizer = () => {
   const initializeFFmpeg = async () => {
       try {
         setFfmpegLoading(true);
+        console.log('Initializing FFmpeg...');
+        
+        const baseUrl = window.location.origin;
+        console.log('Base URL:', baseUrl);
+        
+        const corePath = `${baseUrl}/ffmpeg/ffmpeg-core.js`;
+        const wasmPath = `${baseUrl}/ffmpeg/ffmpeg-core.wasm`;
+        const workerPath = `${baseUrl}/ffmpeg/ffmpeg-core.worker.js`;
+        
+        console.log('FFmpeg Paths:', {
+          corePath,
+          wasmPath,
+          workerPath
+        });
+
         ffmpegRef.current = new FFmpeg({
           log: true,
+          logger: ({ message }) => {
+            console.log(`[FFmpeg] ${message}`);
+            if (message.includes('Loading ffmpeg-core.js')) {
+              setCompressionStatus('Cargando FFmpeg core...');
+            }
+          },
           progress: ({ ratio }) => {
             if (ratio < 0 || ratio > 1) return;
             setProgress(Math.floor(ratio * 100));
           },
-          corePath: '/ffmpeg/ffmpeg-core.js',
-          workerPath: '/ffmpeg/ffmpeg-core.worker.js',
-          wasmPath: '/ffmpeg/ffmpeg-core.wasm', 
-          loadTimeout: 60000,
-          logger: ({ message }) => {
-            console.log(`[FFmpeg] ${message}`);
-          },
+          corePath,
+          wasmPath,
+          workerPath,
+          loadTimeout: 120000, // 120 segundos
         });
-        
-        console.log('Loading FFmpeg...');
-        
-        // Add timeout to detect hanging load process
-        const loadPromise = ffmpegRef.current.load();
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('FFmpeg load timeout - took too long to load')), 30000);
-        });
-        
-        await Promise.race([loadPromise, timeoutPromise]);
-        
-        // Perform a simple test to ensure FFmpeg is actually working
-        try {
-          await ffmpegRef.current.fs('writeFile', 'test.txt', new Uint8Array([1, 2, 3]));
-          await ffmpegRef.current.fs('readFile', 'test.txt');
-          await ffmpegRef.current.fs('unlink', 'test.txt');
-        } catch (e) {
-          throw new Error(`FFmpeg file system test failed: ${e.message}`);
-        }
 
+        console.log('FFmpeg instance created, attempting to load...');
+        setCompressionStatus('Iniciando carga de FFmpeg...');
+        
+        await ffmpegRef.current.load();
+        
         console.log('FFmpeg loaded successfully');
         setFfmpegLoaded(true);
+        setCompressionStatus('FFmpeg cargado exitosamente');
       } catch (error) {
-        console.error('Error initializing FFmpeg:', error);
-        let errorMessage = 'No se pudo inicializar FFmpeg: ' + error.message;
-        
-        // Provide more specific error messages for common issues
-        if (error.message.includes('timeout')) {
-          errorMessage = 'La carga de FFmpeg tomó demasiado tiempo. Verifica tu conexión a internet y vuelve a intentar.';
-        } else if (error.message.includes('fetch')) {
-          errorMessage = 'No se pudieron cargar los archivos necesarios de FFmpeg. Verifica tu conexión a internet.';
-        } else if (error.message.includes('CORS') || error.message.includes('cross-origin')) {
-          errorMessage = 'Error de permisos CORS al cargar FFmpeg. El navegador está bloqueando la carga de recursos necesarios. Intenta con otro navegador o verifica la configuración del servidor.';
-        }
-        
-        setFfmpegError(errorMessage);
-        showSnackbar(`Error al inicializar el compresor de video: ${errorMessage}`, 'error');
+        console.error('Detailed FFmpeg initialization error:', error);
+        setFfmpegError(
+          `Error al inicializar FFmpeg: ${error.message}\nVerifique la consola para más detalles.`
+        );
+        showSnackbar(
+          `Error al inicializar el compresor de video: ${error.message}`,
+          'error'
+        );
       } finally {
         setFfmpegLoading(false);
       }
