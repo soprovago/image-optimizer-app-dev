@@ -12,4 +12,17 @@ export default defineConfig({
       "Cross-Origin-Opener-Policy": "same-origin",
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'mui-core': ['@mui/material'],
+          'mui-icons': ['@mui/icons-material'],
+          'firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+        }
+      }
+    },
+    chunkSizeWarningLimit: 500,
+  }
 });
