@@ -1,6 +1,55 @@
 import { createTheme } from '@mui/material';
 
+const commonTheme = {
+  typography: {
+    fontFamily: 'var(--font-primary)',
+    h1: {
+      fontFamily: 'var(--font-secondary)',
+    },
+    h2: {
+      fontFamily: 'var(--font-secondary)',
+    },
+    h3: {
+      fontFamily: 'var(--font-secondary)',
+    },
+    h4: {
+      fontFamily: 'var(--font-secondary)',
+    },
+    h5: {
+      fontFamily: 'var(--font-secondary)',
+    },
+    h6: {
+      fontFamily: 'var(--font-secondary)',
+    },
+  },
+  shape: {
+    borderRadius: 8,
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          fontFamily: 'var(--font-secondary)',
+        },
+      },
+    },
+    MuiTextField: {
+      styleOverrides: {
+        root: {
+          '& .MuiInputBase-input:-webkit-autofill': {
+            '-webkit-box-shadow': '0 0 0 100px transparent inset',
+            '-webkit-text-fill-color': 'inherit',
+            'transition': 'background-color 5000s ease-in-out 0s'
+          }
+        }
+      }
+    },
+  },
+};
+
 export const lightTheme = createTheme({
+  ...commonTheme,
   palette: {
     mode: 'light',
     primary: {
@@ -14,35 +63,10 @@ export const lightTheme = createTheme({
       paper: '#ffffff',
     },
   },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-  },
-  shape: {
-    borderRadius: 8,
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-        },
-      },
-    },
-    MuiTextField: {
-      styleOverrides: {
-        root: {
-          '& .MuiInputBase-input:-webkit-autofill': {
-            '-webkit-box-shadow': '0 0 0 100px transparent inset',
-            '-webkit-text-fill-color': 'inherit',
-            'transition': 'background-color 5000s ease-in-out 0s'
-          }
-        }
-      }
-    },
-  },
 });
 
 export const darkTheme = createTheme({
+  ...commonTheme,
   palette: {
     mode: 'dark',
     primary: {
@@ -56,31 +80,4 @@ export const darkTheme = createTheme({
       paper: '#1e1e1e',
     },
   },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-  },
-  shape: {
-    borderRadius: 8,
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'none',
-        },
-      },
-    },
-    MuiTextField: {
-      styleOverrides: {
-        root: {
-          '& .MuiInputBase-input:-webkit-autofill': {
-            '-webkit-box-shadow': '0 0 0 100px transparent inset',
-            '-webkit-text-fill-color': 'inherit',
-            'transition': 'background-color 5000s ease-in-out 0s'
-          }
-        }
-      }
-    },
-  },
 });
-
