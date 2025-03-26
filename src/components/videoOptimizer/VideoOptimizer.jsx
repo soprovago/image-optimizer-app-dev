@@ -15,16 +15,50 @@ const VideoOptimizer = () => {
   const [quality, setQuality] = useState(75);
   const [scale, setScale] = useState(1);
   const [processingVideo, setProcessingVideo] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const videoRef = useRef(null);
+  const dropZoneRef = useRef(null);
+
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0 && files[0].type.startsWith('video/')) {
+      processFile(files[0]);
+    }
+  };
+
+  const processFile = (file) => {
+    setVideoFile(file);
+    const url = URL.createObjectURL(file);
+    if (videoRef.current) {
+      videoRef.current.src = url;
+    }
+  };
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (file && file.type.startsWith('video/')) {
-      setVideoFile(file);
-      const url = URL.createObjectURL(file);
-      if (videoRef.current) {
-        videoRef.current.src = url;
-      }
+      processFile(file);
     }
   };
 
@@ -36,138 +70,68 @@ const VideoOptimizer = () => {
       setStatus('Iniciando compresión...');
       setProgress(0);
 
-      // Verificar soporte de WebCodecs
       if (!('VideoEncoder' in window)) {
         throw new Error('WebCodecs API no está soportada en este navegador');
       }
 
-      // Crear elemento de video para el source
       const sourceVideo = document.createElement('video');
       sourceVideo.src = URL.createObjectURL(videoFile);
       
-      // Esperar a que los metadatos del video estén cargados
       await new Promise((resolve) => {
-        sourceVideo.onloadedmetadata = resolve;
+        sourceVideo.onloadedmetadata = () => {
+          sourceVideo.play();
+          resolve();
+        };
       });
 
-      // Configurar dimensiones
       const targetWidth = Math.floor(sourceVideo.videoWidth * scale);
       const targetHeight = Math.floor(sourceVideo.videoHeight * scale);
 
-      // Crear canvas para el procesamiento
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       canvas.width = targetWidth;
       canvas.height = targetHeight;
 
-      // Array para almacenar los chunks codificados
-      const encodedChunks = [];
-
-      // Configurar el encoder
-      const videoEncoder = new VideoEncoder({
-        output: async (chunk, metadata) => {
-          encodedChunks.push(chunk);
-          const currentProgress = (metadata.timestamp / (sourceVideo.duration * 1000000)) * 100;
-          setProgress(Math.min(Math.floor(currentProgress), 100));
-        },
-        error: (error) => {
-          console.error(error);
-          setStatus('Error durante la codificación: ' + error.message);
-        }
+      const mediaRecorder = new MediaRecorder(canvas.captureStream(), {
+        mimeType: 'video/mp4',
+        videoBitsPerSecond: 1_000_000 * (quality / 100)
       });
 
-      // Función para obtener la configuración de codec soportada
-      const getCodecConfig = async () => {
-        const codecs = [
-          'avc1.42E01E', // H.264 baseline
-          'vp09.00.10.08', // VP9
-          'vp8' // VP8
-        ];
+      const chunks = [];
+      mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
 
-        for (const codec of codecs) {
-          try {
-            const support = await VideoEncoder.isConfigSupported({
-              codec,
-              width: targetWidth,
-              height: targetHeight,
-              bitrate: 1_000_000 * (quality / 100),
-              framerate: 30
-            });
-
-            if (support.supported) {
-              return {
-                codec,
-                width: targetWidth,
-                height: targetHeight,
-                bitrate: 1_000_000 * (quality / 100),
-                framerate: 30,
-                // Añadir configuraciones específicas para mejor calidad
-                ...(codec.startsWith('avc1') && {
-                  avc: { format: 'annexb' },
-                  hardwareAcceleration: 'prefer'
-                })
-              };
-            }
-          } catch (e) {
-            console.warn(`Codec ${codec} no soportado:`, e);
-          }
-        }
-        throw new Error('No se encontró ningún codec compatible');
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/mp4' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `video-optimizado-${quality}calidad-${scale}x.mp4`;
+        a.click();
+        URL.revokeObjectURL(url);
+        setStatus('¡Video optimizado con éxito!');
       };
 
-      // Obtener configuración de codec compatible
-      const config = await getCodecConfig();
-      await videoEncoder.configure(config);
-      setStatus('Procesando video...');
+      const totalFrames = Math.ceil(sourceVideo.duration * 30);
+      let processedFrames = 0;
 
-      // Procesar frames
-      const frameRate = 30;
-      const frameDuration = 1000000 / frameRate; // en microsegundos
-      
-      // Función para procesar un frame
-      const processFrame = async (timestamp) => {
+      const processFrame = () => {
+        if (sourceVideo.ended || processedFrames >= totalFrames) {
+          mediaRecorder.stop();
+          return;
+        }
+
         ctx.drawImage(sourceVideo, 0, 0, targetWidth, targetHeight);
-        const imageBitmap = await createImageBitmap(canvas);
-        const frame = new VideoFrame(imageBitmap, {
-          timestamp: Math.floor(timestamp * 1000000),
-          duration: frameDuration
-        });
-        await videoEncoder.encode(frame);
-        frame.close();
-        imageBitmap.close();
+        processedFrames++;
+        
+        const currentProgress = (processedFrames / totalFrames) * 100;
+        setProgress(Math.min(Math.floor(currentProgress), 100));
+
+        requestAnimationFrame(processFrame);
       };
 
-      // Procesar video en chunks para mejor rendimiento
-      const chunkSize = 1; // segundos por chunk
-      for (let time = 0; time < sourceVideo.duration; time += chunkSize) {
-        setStatus(`Procesando chunk ${Math.floor(time/chunkSize) + 1} de ${Math.ceil(sourceVideo.duration/chunkSize)}...`);
-        sourceVideo.currentTime = time;
-        await new Promise(resolve => { sourceVideo.onseeked = resolve; });
-        
-        const endTime = Math.min(time + chunkSize, sourceVideo.duration);
-        while (sourceVideo.currentTime < endTime) {
-          await processFrame(sourceVideo.currentTime);
-          sourceVideo.currentTime += 1/frameRate;
-        }
-      }
+      mediaRecorder.start();
+      processFrame();
 
-      // Finalizar la codificación
-      await videoEncoder.flush();
-      videoEncoder.close();
-
-      // Crear el archivo final con el tipo MIME adecuado según el codec
-      const mimeType = config.codec.startsWith('avc1') ? 'video/mp4' : 'video/webm';
-      const extension = mimeType === 'video/mp4' ? 'mp4' : 'webm';
-      const blob = new Blob(encodedChunks, { type: `${mimeType}; codecs=${config.codec}` });
-      const url = URL.createObjectURL(blob);
-
-      // Crear enlace de descarga
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `video-optimizado-${quality}calidad-${scale}x.${extension}`;
-      a.click();
-
-      setStatus('¡Video optimizado con éxito!');
     } catch (error) {
       console.error('Error:', error);
       setStatus('Error: ' + error.message);
@@ -182,24 +146,43 @@ const VideoOptimizer = () => {
         Optimizador de Video
       </Typography>
       
-      <input
-        accept="video/*"
-        type="file"
-        onChange={handleFileChange}
-        style={{ display: 'none' }}
-        id="video-input"
-      />
-      
-      <Box sx={{ my: 2 }}>
+      <Box
+        ref={dropZoneRef}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        sx={{
+          border: '2px dashed',
+          borderColor: isDragging ? 'primary.main' : 'grey.300',
+          borderRadius: 2,
+          p: 3,
+          textAlign: 'center',
+          bgcolor: isDragging ? 'rgba(0, 0, 0, 0.05)' : 'transparent',
+          transition: 'all 0.3s ease'
+        }}
+      >
+        <input
+          accept="video/*"
+          type="file"
+          onChange={handleFileChange}
+          style={{ display: 'none' }}
+          id="video-input"
+        />
+        
         <label htmlFor="video-input">
-          <Button variant="contained" component="span">
+          <Button variant="contained" component="span" sx={{ mb: 2 }}>
             Seleccionar Video
           </Button>
         </label>
+        
+        <Typography>
+          o arrastra y suelta tu video aquí
+        </Typography>
       </Box>
 
       {videoFile && (
-        <>
+        <Box sx={{ mt: 3 }}>
           <video
             ref={videoRef}
             controls
@@ -262,7 +245,7 @@ const VideoOptimizer = () => {
               </Typography>
             </Box>
           )}
-        </>
+        </Box>
       )}
     </Box>
   );
