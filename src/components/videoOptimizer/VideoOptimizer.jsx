@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { fetchFile } from '@ffmpeg/util';
+import { fetchFile, toBlobURL } from '@ffmpeg/util';
 import {
   Box,
   Button,
@@ -64,6 +64,9 @@ const DropZone = styled(Paper)(({ theme, isDragActive, hasFile }) => ({
 }));
 
 const VideoOptimizer = () => {
+  // Definir baseUrl como una constante al inicio del componente para asegurar consistencia
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+
   // FFmpeg instance
   const ffmpegRef = useRef(null);
   const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
@@ -89,49 +92,89 @@ const VideoOptimizer = () => {
   const initializeFFmpeg = async () => {
       try {
         setFfmpegLoading(true);
-        console.log('Initializing FFmpeg...');
-        
-        const baseUrl = window.location.origin;
+        console.log('==== Initializing FFmpeg ====');
+        console.log('Environment:', process.env.NODE_ENV);
         console.log('Base URL:', baseUrl);
         
-        const corePath = `${baseUrl}/ffmpeg/ffmpeg-core.js`;
-        const wasmPath = `${baseUrl}/ffmpeg/ffmpeg-core.wasm`;
-        const workerPath = `${baseUrl}/ffmpeg/ffmpeg-core.worker.js`;
+        // Definir las URLs absolutas para los archivos core
+        const corePath = new URL('/ffmpeg/ffmpeg-core.js', baseUrl).href;
+        const wasmPath = new URL('/ffmpeg/ffmpeg-core.wasm', baseUrl).href;
+        const workerPath = new URL('/ffmpeg/ffmpeg-core.worker.js', baseUrl).href;
         
-        console.log('FFmpeg Paths:', {
+        console.log('FFmpeg Core Paths:', {
           corePath,
           wasmPath,
           workerPath
         });
 
+        // Crear instancia de FFmpeg con más logging
+        console.log('Creating FFmpeg instance with enhanced logging');
         ffmpegRef.current = new FFmpeg({
           log: true,
-          logger: ({ message }) => {
-            console.log(`[FFmpeg] ${message}`);
+          logger: ({ message, type }) => {
+            const logPrefix = type === 'fferr' ? '[FFmpeg ERROR]' : '[FFmpeg]';
+            console.log(`${logPrefix} ${message}`);
+            
+            // Actualizar estado basado en mensajes importantes
             if (message.includes('Loading ffmpeg-core.js')) {
               setCompressionStatus('Cargando FFmpeg core...');
+            } else if (message.includes('ffmpeg-core.wasm')) {
+              setCompressionStatus('Cargando módulo WASM...');
+            } else if (message.includes('worker')) {
+              setCompressionStatus('Inicializando worker...');
             }
           },
           progress: ({ ratio }) => {
-            if (ratio < 0 || ratio > 1) return;
-            setProgress(Math.floor(ratio * 100));
-          },
-          corePath,
-          wasmPath,
-          workerPath,
-          loadTimeout: 120000, // 120 segundos
+            if (ratio < 0 || ratio > 1) {
+              console.log('[FFmpeg] Progress ratio out of bounds:', ratio);
+              return;
+            }
+            const percent = Math.floor(ratio * 100);
+            console.log(`[FFmpeg] Processing: ${percent}%`);
+            setProgress(percent);
+          }
         });
 
-        console.log('FFmpeg instance created, attempting to load...');
+        console.log('FFmpeg instance created, attempting to load core files...');
         setCompressionStatus('Iniciando carga de FFmpeg...');
         
-        await ffmpegRef.current.load();
+        // Preparar URLs Blob para los archivos core
+        console.log('Converting core files to Blob URLs...');
+        try {
+          const coreBlob = await toBlobURL(corePath, 'text/javascript');
+          console.log('Core JS converted to blob successfully');
+          
+          const wasmBlob = await toBlobURL(wasmPath, 'application/wasm');
+          console.log('WASM file converted to blob successfully');
+          
+          const workerBlob = await toBlobURL(workerPath, 'text/javascript');
+          console.log('Worker JS converted to blob successfully');
+          
+          // Cargar FFmpeg con los archivos blob
+          console.log('Loading FFmpeg with blob URLs...');
+          await ffmpegRef.current.load({
+            coreURL: coreBlob,
+            wasmURL: wasmBlob,
+            workerURL: workerBlob
+          });
+        } catch (blobError) {
+          console.error('Error creating blob URLs:', blobError);
+          throw new Error(`Error preparando archivos de FFmpeg: ${blobError.message}`);
+        }
         
-        console.log('FFmpeg loaded successfully');
+        console.log('==== FFmpeg loaded successfully ====');
         setFfmpegLoaded(true);
         setCompressionStatus('FFmpeg cargado exitosamente');
       } catch (error) {
-        console.error('Detailed FFmpeg initialization error:', error);
+        console.error('==== FFmpeg Initialization Failed ====');
+        console.error('Error details:', error);
+        console.error('Error stack:', error.stack);
+        
+        // Información de diagnóstico
+        console.log('Browser information:', navigator.userAgent);
+        console.log('Protocol:', window.location.protocol);
+        console.log('Is secure context:', window.isSecureContext);
+        
         setFfmpegError(
           `Error al inicializar FFmpeg: ${error.message}\nVerifique la consola para más detalles.`
         );
@@ -192,12 +235,20 @@ const VideoOptimizer = () => {
     // Proceso real de optimización con FFmpeg
     return new Promise(async (resolve, reject) => {
       try {
+        console.log('Starting video optimization process');
         const ffmpeg = ffmpegRef.current;
         const fileName = file.name;
         const outputFileName = `compressed_${fileName}`;
         
+        // Verificar que ffmpeg está correctamente inicializado
+        if (!ffmpeg || typeof ffmpeg.fs !== 'function') {
+          console.error('FFmpeg no está correctamente inicializado', ffmpeg);
+          throw new Error('El componente de compresión no está correctamente inicializado');
+        }
+        
         // Escribir el archivo en el sistema de archivos virtual de FFmpeg
         setCompressionStatus('Preparando el video...');
+        console.log(`Writing input file "${fileName}" to FFmpeg virtual filesystem`);
         ffmpeg.fs('writeFile', fileName, await fetchFile(file));
         
         // Ejecutar FFmpeg para comprimir el video
@@ -240,6 +291,17 @@ const VideoOptimizer = () => {
         
       } catch (error) {
         console.error('Error comprimiendo video:', error);
+        console.error('Error stack:', error.stack);
+        
+        // Información adicional de diagnóstico
+        console.log('FFmpeg instance state:', ffmpegRef.current ? 'Exists' : 'Not exists');
+        console.log('File info:', {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          lastModified: new Date(file.lastModified).toISOString()
+        });
+        
         setLoading(false);
         setCompressionStatus('');
         showSnackbar(`Error al comprimir: ${error.message}`, 'error');
