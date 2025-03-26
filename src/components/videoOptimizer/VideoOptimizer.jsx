@@ -1,23 +1,21 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { 
   Button, 
   Slider, 
   Box, 
   Typography, 
   CircularProgress,
-  LinearProgress 
+  Alert
 } from '@mui/material';
 
 const VideoOptimizer = () => {
   const [videoFile, setVideoFile] = useState(null);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState({ type: '', message: '' });
   const [progress, setProgress] = useState(0);
   const [quality, setQuality] = useState(75);
   const [scale, setScale] = useState(1);
   const [processingVideo, setProcessingVideo] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const videoRef = useRef(null);
-  const dropZoneRef = useRef(null);
 
   const handleDragEnter = (e) => {
     e.preventDefault();
@@ -44,21 +42,28 @@ const VideoOptimizer = () => {
     const files = e.dataTransfer.files;
     if (files.length > 0 && files[0].type.startsWith('video/')) {
       processFile(files[0]);
+    } else {
+      setStatus({
+        type: 'error',
+        message: 'Por favor, selecciona un archivo de video válido.'
+      });
     }
   };
 
   const processFile = (file) => {
     setVideoFile(file);
-    const url = URL.createObjectURL(file);
-    if (videoRef.current) {
-      videoRef.current.src = url;
-    }
+    setStatus({ type: '', message: '' });
   };
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     if (file && file.type.startsWith('video/')) {
       processFile(file);
+    } else {
+      setStatus({
+        type: 'error',
+        message: 'Por favor, selecciona un archivo de video válido.'
+      });
     }
   };
 
@@ -67,74 +72,74 @@ const VideoOptimizer = () => {
     
     try {
       setProcessingVideo(true);
-      setStatus('Iniciando compresión...');
+      setStatus({
+        type: 'info',
+        message: 'Iniciando compresión...'
+      });
       setProgress(0);
 
-      if (!('VideoEncoder' in window)) {
-        throw new Error('WebCodecs API no está soportada en este navegador');
-      }
-
-      const sourceVideo = document.createElement('video');
-      sourceVideo.src = URL.createObjectURL(videoFile);
+      const videoElement = document.createElement('video');
+      videoElement.src = URL.createObjectURL(videoFile);
       
       await new Promise((resolve) => {
-        sourceVideo.onloadedmetadata = () => {
-          sourceVideo.play();
+        videoElement.onloadedmetadata = () => {
+          videoElement.play();
           resolve();
         };
       });
 
-      const targetWidth = Math.floor(sourceVideo.videoWidth * scale);
-      const targetHeight = Math.floor(sourceVideo.videoHeight * scale);
-
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      canvas.width = targetWidth;
-      canvas.height = targetHeight;
-
-      const mediaRecorder = new MediaRecorder(canvas.captureStream(), {
-        mimeType: 'video/mp4',
-        videoBitsPerSecond: 1_000_000 * (quality / 100)
+      const stream = videoElement.captureStream();
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'video/webm;codecs=h264,opus'
       });
 
       const chunks = [];
       mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
 
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'video/mp4' });
-        const url = URL.createObjectURL(blob);
+      const totalDuration = videoElement.duration;
+      let startTime = Date.now();
+
+      mediaRecorder.onstop = async () => {
+        const webmBlob = new Blob(chunks, { type: 'video/webm' });
+        
+        // Convertir WebM a MP4 manteniendo el audio
+        const response = await fetch(URL.createObjectURL(webmBlob));
+        const arrayBuffer = await response.arrayBuffer();
+        
+        const mp4Blob = new Blob([arrayBuffer], { type: 'video/mp4' });
+        const url = URL.createObjectURL(mp4Blob);
+        
         const a = document.createElement('a');
         a.href = url;
         a.download = `video-optimizado-${quality}calidad-${scale}x.mp4`;
         a.click();
+        
         URL.revokeObjectURL(url);
-        setStatus('¡Video optimizado con éxito!');
+        setStatus({
+          type: 'success',
+          message: '¡Video optimizado exitosamente!'
+        });
       };
 
-      const totalFrames = Math.ceil(sourceVideo.duration * 30);
-      let processedFrames = 0;
-
-      const processFrame = () => {
-        if (sourceVideo.ended || processedFrames >= totalFrames) {
-          mediaRecorder.stop();
-          return;
-        }
-
-        ctx.drawImage(sourceVideo, 0, 0, targetWidth, targetHeight);
-        processedFrames++;
-        
-        const currentProgress = (processedFrames / totalFrames) * 100;
-        setProgress(Math.min(Math.floor(currentProgress), 100));
-
-        requestAnimationFrame(processFrame);
+      videoElement.ontimeupdate = () => {
+        const currentTime = videoElement.currentTime;
+        const progressPercent = (currentTime / totalDuration) * 100;
+        setProgress(Math.min(Math.round(progressPercent), 100));
       };
 
       mediaRecorder.start();
-      processFrame();
+      
+      videoElement.onended = () => {
+        mediaRecorder.stop();
+        stream.getTracks().forEach(track => track.stop());
+      };
 
     } catch (error) {
       console.error('Error:', error);
-      setStatus('Error: ' + error.message);
+      setStatus({
+        type: 'error',
+        message: `Error al procesar el video: ${error.message}`
+      });
     } finally {
       setProcessingVideo(false);
     }
@@ -146,8 +151,17 @@ const VideoOptimizer = () => {
         Optimizador de Video
       </Typography>
       
+      {status.message && (
+        <Alert 
+          severity={status.type || 'info'} 
+          sx={{ mb: 2 }}
+          onClose={() => setStatus({ type: '', message: '' })}
+        >
+          {status.message}
+        </Alert>
+      )}
+
       <Box
-        ref={dropZoneRef}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -179,16 +193,16 @@ const VideoOptimizer = () => {
         <Typography>
           o arrastra y suelta tu video aquí
         </Typography>
+
+        {videoFile && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Archivo seleccionado: {videoFile.name}
+          </Typography>
+        )}
       </Box>
 
       {videoFile && (
-        <Box sx={{ mt: 3 }}>
-          <video
-            ref={videoRef}
-            controls
-            style={{ maxWidth: '100%', marginBottom: '1rem' }}
-          />
-
+        <Box sx={{ mt: 3, textAlign: 'center' }}>
           <Typography gutterBottom>
             Calidad de Compresión: {quality}%
           </Typography>
@@ -214,37 +228,42 @@ const VideoOptimizer = () => {
             sx={{ mb: 2 }}
           />
 
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={compressVideo}
-            disabled={processingVideo}
-            sx={{ mb: 2 }}
-          >
-            {processingVideo ? (
-              <CircularProgress size={24} />
-            ) : (
-              'Comprimir Video'
+          <Box sx={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+            {processingVideo && (
+              <Box sx={{ position: 'relative', display: 'inline-flex', mb: 2 }}>
+                <CircularProgress
+                  variant="determinate"
+                  value={progress}
+                  size={60}
+                />
+                <Box
+                  sx={{
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    right: 0,
+                    position: 'absolute',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Typography variant="caption" component="div" color="text.secondary">
+                    {`${Math.round(progress)}%`}
+                  </Typography>
+                </Box>
+              </Box>
             )}
-          </Button>
 
-          {status && (
-            <Typography 
-              color={status.includes('Error') ? 'error' : 'primary'}
-              sx={{ mb: 1 }}
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={compressVideo}
+              disabled={processingVideo}
             >
-              {status}
-            </Typography>
-          )}
-
-          {processingVideo && (
-            <Box sx={{ width: '100%', mb: 2 }}>
-              <LinearProgress variant="determinate" value={progress} />
-              <Typography variant="body2" color="text.secondary">
-                {Math.round(progress)}%
-              </Typography>
-            </Box>
-          )}
+              {processingVideo ? 'Procesando...' : 'Comprimir Video'}
+            </Button>
+          </Box>
         </Box>
       )}
     </Box>
