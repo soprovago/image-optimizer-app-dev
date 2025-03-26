@@ -101,20 +101,20 @@ const VideoOptimizer = () => {
       
       console.log('Loading FFmpeg with paths:', { corePath, wasmPath, workerPath });
       
-      ffmpegRef.current = new FFmpeg();
-      
-      // Configurar logging detallado
-      ffmpegRef.current.setLogger(({ message }) => {
-        console.log(`[FFmpeg] ${message}`);
-        if (message.includes('Loading ffmpeg-core.js')) {
-          setCompressionStatus('Cargando FFmpeg core...');
-        }
-      });
-      
-      ffmpegRef.current.setProgress(({ ratio }) => {
-        if (ratio >= 0 && ratio <= 1) {
-          const percent = Math.floor(ratio * 100);
-          setProgress(percent);
+      // Configurar FFmpeg con las opciones de logger y progress en el constructor
+      ffmpegRef.current = new FFmpeg({
+        log: true,
+        logger: ({ message }) => {
+          console.log(`[FFmpeg] ${message}`);
+          if (message.includes('Loading ffmpeg-core.js')) {
+            setCompressionStatus('Cargando FFmpeg core...');
+          }
+        },
+        progress: ({ ratio }) => {
+          if (ratio >= 0 && ratio <= 1) {
+            const percent = Math.floor(ratio * 100);
+            setProgress(percent);
+          }
         }
       });
 
