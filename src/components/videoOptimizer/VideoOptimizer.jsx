@@ -1,12 +1,20 @@
 import React, { useState } from 'react';
 import { 
   Button, 
-  Slider, 
   Box, 
-  Typography, 
-  CircularProgress,
-  Alert
+  Typography,
+  Alert,
+  Paper,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  CircularProgress
 } from '@mui/material';
+import VideoFileIcon from '@mui/icons-material/VideoFile';
+import DeleteIcon from '@mui/icons-material/Delete';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 const VideoOptimizer = () => {
   const [videoFile, setVideoFile] = useState(null);
@@ -54,6 +62,11 @@ const VideoOptimizer = () => {
     setVideoFile(file);
     setStatus({ type: '', message: '' });
   };
+  
+  const handleRemoveFile = () => {
+    setVideoFile(null);
+    setStatus({ type: '', message: '' });
+  };
 
   const handleFileChange = (event) => {
     const file = event.target.files[0];
@@ -80,10 +93,10 @@ const VideoOptimizer = () => {
 
       const videoElement = document.createElement('video');
       videoElement.src = URL.createObjectURL(videoFile);
+      videoElement.muted = true;
       
       await new Promise((resolve) => {
         videoElement.onloadedmetadata = () => {
-          videoElement.play();
           resolve();
         };
       });
@@ -111,7 +124,7 @@ const VideoOptimizer = () => {
         
         const a = document.createElement('a');
         a.href = url;
-        a.download = `video-optimizado-${quality}calidad-${scale}x.mp4`;
+        a.download = `video-optimizado.mp4`;
         a.click();
         
         URL.revokeObjectURL(url);
@@ -146,14 +159,24 @@ const VideoOptimizer = () => {
   };
 
   return (
-    <Box sx={{ p: 2, maxWidth: 600, mx: 'auto' }}>
-      <Typography variant="h5" gutterBottom>
+    <Box 
+      sx={{ 
+        width: '100%',
+        maxWidth: 600,
+        mx: 'auto',
+        p: 3,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2 
+      }}
+    >
+      <Typography variant="h5" gutterBottom align="center">
         Optimizador de Video
       </Typography>
-      
+
       {status.message && (
         <Alert 
-          severity={status.type || 'info'} 
+          severity={status.type} 
           sx={{ mb: 2 }}
           onClose={() => setStatus({ type: '', message: '' })}
         >
@@ -161,109 +184,114 @@ const VideoOptimizer = () => {
         </Alert>
       )}
 
-      <Box
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 3,
+          backgroundColor: isDragging ? 'action.hover' : 'background.paper',
+          border: '2px dashed',
+          borderColor: isDragging ? 'primary.main' : 'grey.300',
+          cursor: 'pointer'
+        }}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        sx={{
-          border: '2px dashed',
-          borderColor: isDragging ? 'primary.main' : 'grey.300',
-          borderRadius: 2,
-          p: 3,
-          textAlign: 'center',
-          bgcolor: isDragging ? 'rgba(0, 0, 0, 0.05)' : 'transparent',
-          transition: 'all 0.3s ease'
-        }}
       >
-        <input
-          accept="video/*"
-          type="file"
-          onChange={handleFileChange}
-          style={{ display: 'none' }}
-          id="video-input"
-        />
-        
-        <label htmlFor="video-input">
-          <Button variant="contained" component="span" sx={{ mb: 2 }}>
-            Seleccionar Video
-          </Button>
-        </label>
-        
-        <Typography>
-          o arrastra y suelta tu video aquí
-        </Typography>
-
-        {videoFile && (
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Archivo seleccionado: {videoFile.name}
-          </Typography>
-        )}
-      </Box>
-
-      {videoFile && (
-        <Box sx={{ mt: 3, textAlign: 'center' }}>
-          <Typography gutterBottom>
-            Calidad de Compresión: {quality}%
-          </Typography>
-          <Slider
-            value={quality}
-            onChange={(e, newValue) => setQuality(newValue)}
-            min={1}
-            max={100}
-            valueLabelDisplay="auto"
-            sx={{ mb: 2 }}
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 2
+          }}
+        >
+          <input
+            accept="video/*"
+            type="file"
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+            id="video-input"
           />
 
-          <Typography gutterBottom>
-            Escala: {scale.toFixed(2)}x
-          </Typography>
-          <Slider
-            value={scale}
-            onChange={(e, newValue) => setScale(newValue)}
-            min={0.1}
-            max={1}
-            step={0.1}
-            valueLabelDisplay="auto"
-            sx={{ mb: 2 }}
-          />
-
-          <Box sx={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-            {processingVideo && (
-              <Box sx={{ position: 'relative', display: 'inline-flex', mb: 2 }}>
-                <CircularProgress
-                  variant="determinate"
-                  value={progress}
-                  size={60}
-                />
-                <Box
-                  sx={{
-                    top: 0,
-                    left: 0,
-                    bottom: 0,
-                    right: 0,
-                    position: 'absolute',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
+          {!videoFile ? (
+            <>
+              <CloudUploadIcon sx={{ fontSize: 48, color: 'primary.main' }} />
+              <Typography variant="h6" align="center">
+                Arrastra y suelta tu video aquí
+              </Typography>
+              <Typography variant="body2" color="textSecondary" align="center">
+                o
+              </Typography>
+              <label htmlFor="video-input">
+                <Button
+                  variant="contained"
+                  component="span"
+                  startIcon={<VideoFileIcon />}
                 >
-                  <Typography variant="caption" component="div" color="text.secondary">
-                    {`${Math.round(progress)}%`}
-                  </Typography>
-                </Box>
-              </Box>
-            )}
+                  Seleccionar Video
+                </Button>
+              </label>
+            </>
+          ) : (
+            <List sx={{ width: '100%' }}>
+              <ListItem
+                secondaryAction={
+                  <Button
+                    edge="end"
+                    aria-label="delete"
+                    onClick={handleRemoveFile}
+                    startIcon={<DeleteIcon />}
+                  >
+                    Eliminar
+                  </Button>
+                }
+              >
+                <ListItemIcon>
+                  <VideoFileIcon />
+                </ListItemIcon>
+                <ListItemText
+                  primary={videoFile.name}
+                  secondary={`${(videoFile.size / (1024 * 1024)).toFixed(2)} MB`}
+                />
+              </ListItem>
+            </List>
+          )}
+        </Box>
+      </Paper>
 
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={compressVideo}
-              disabled={processingVideo}
-            >
-              {processingVideo ? 'Procesando...' : 'Comprimir Video'}
-            </Button>
-          </Box>
+      {videoFile && !processingVideo && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={compressVideo}
+            startIcon={<CheckCircleIcon />}
+          >
+            Optimizar Video
+          </Button>
+        </Box>
+      )}
+
+      {processingVideo && (
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            mt: 2,
+            gap: 1
+          }}
+        >
+          <CircularProgress
+            variant="determinate"
+            value={progress}
+            size={60}
+            thickness={4}
+          />
+          <Typography variant="body2" color="textSecondary">
+            {progress}% Completado
+          </Typography>
         </Box>
       )}
     </Box>
