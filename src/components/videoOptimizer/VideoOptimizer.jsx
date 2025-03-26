@@ -20,8 +20,6 @@ const VideoOptimizer = () => {
   const [videoFile, setVideoFile] = useState(null);
   const [status, setStatus] = useState({ type: '', message: '' });
   const [progress, setProgress] = useState(0);
-  const [quality, setQuality] = useState(75);
-  const [scale, setScale] = useState(1);
   const [processingVideo, setProcessingVideo] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -46,6 +44,7 @@ const VideoOptimizer = () => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
+    setProgress(0);
 
     const files = e.dataTransfer.files;
     if (files.length > 0 && files[0].type.startsWith('video/')) {
@@ -61,11 +60,7 @@ const VideoOptimizer = () => {
   const processFile = (file) => {
     setVideoFile(file);
     setStatus({ type: '', message: '' });
-  };
-  
-  const handleRemoveFile = () => {
-    setVideoFile(null);
-    setStatus({ type: '', message: '' });
+    setProgress(0);
   };
 
   const handleFileChange = (event) => {
@@ -80,20 +75,43 @@ const VideoOptimizer = () => {
     }
   };
 
+  const handleRemoveFile = () => {
+    setVideoFile(null);
+    setStatus({ type: '', message: '' });
+    setProgress(0);
+  };
+
   const compressVideo = async () => {
     if (!videoFile) return;
     
     try {
       setProcessingVideo(true);
+      setProgress(0);
       setStatus({
         type: 'info',
-        message: 'Iniciando compresión...'
+        message: 'Procesando video...'
       });
-      setProgress(0);
 
+      // Simular progreso para mejor experiencia de usuario
+      const simulateProgress = () => {
+        setProgress(prev => {
+          if (prev < 90) {
+            return prev + 1;
+          }
+          return prev;
+        });
+      };
+
+      const progressInterval = setInterval(simulateProgress, 100);
+
+      // Create hidden video element
       const videoElement = document.createElement('video');
-      videoElement.src = URL.createObjectURL(videoFile);
+      videoElement.style.display = 'none';
+      document.body.appendChild(videoElement);
+      
+      // Set up video element
       videoElement.muted = true;
+      videoElement.src = URL.createObjectURL(videoFile);
       
       await new Promise((resolve) => {
         videoElement.onloadedmetadata = () => {
@@ -101,47 +119,56 @@ const VideoOptimizer = () => {
         };
       });
 
-      const stream = videoElement.captureStream();
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      // Set canvas dimensions
+      canvas.width = videoElement.videoWidth;
+      canvas.height = videoElement.videoHeight;
+
+      // Get stream from canvas
+      const stream = canvas.captureStream();
+      
+      // Add audio track from original video if available
+      const audioTracks = videoElement.captureStream().getAudioTracks();
+      if (audioTracks.length > 0) {
+        stream.addTrack(audioTracks[0]);
+      }
+
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'video/webm;codecs=h264,opus'
+        mimeType: 'video/webm;codecs=h264,opus',
+        videoBitsPerSecond: 2500000 // 2.5 Mbps
       });
 
       const chunks = [];
       mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
 
-      const totalDuration = videoElement.duration;
-      let startTime = Date.now();
-
       mediaRecorder.onstop = async () => {
+        clearInterval(progressInterval);
         const webmBlob = new Blob(chunks, { type: 'video/webm' });
-        
-        // Convertir WebM a MP4 manteniendo el audio
-        const response = await fetch(URL.createObjectURL(webmBlob));
-        const arrayBuffer = await response.arrayBuffer();
-        
-        const mp4Blob = new Blob([arrayBuffer], { type: 'video/mp4' });
+        const mp4Blob = new Blob([webmBlob], { type: 'video/mp4' });
         const url = URL.createObjectURL(mp4Blob);
         
         const a = document.createElement('a');
         a.href = url;
-        a.download = `video-optimizado.mp4`;
+        a.download = `video_optimizado.mp4`;
         a.click();
         
         URL.revokeObjectURL(url);
+        videoElement.remove();
+        
+        setProgress(100);
         setStatus({
           type: 'success',
           message: '¡Video optimizado exitosamente!'
         });
+        setProcessingVideo(false);
       };
 
-      videoElement.ontimeupdate = () => {
-        const currentTime = videoElement.currentTime;
-        const progressPercent = (currentTime / totalDuration) * 100;
-        setProgress(Math.min(Math.round(progressPercent), 100));
-      };
-
+      // Start recording
+      videoElement.play();
       mediaRecorder.start();
-      
+
       videoElement.onended = () => {
         mediaRecorder.stop();
         stream.getTracks().forEach(track => track.stop());
@@ -151,9 +178,9 @@ const VideoOptimizer = () => {
       console.error('Error:', error);
       setStatus({
         type: 'error',
-        message: `Error al procesar el video: ${error.message}`
+        message: 'Error al procesar el video. Por favor, intenta nuevamente.'
       });
-    } finally {
+      setProgress(0);
       setProcessingVideo(false);
     }
   };
@@ -170,14 +197,13 @@ const VideoOptimizer = () => {
         gap: 2 
       }}
     >
-      <Typography variant="h5" gutterBottom align="center">
+      <Typography variant="h5" component="h1" align="center" gutterBottom>
         Optimizador de Video
       </Typography>
 
       {status.message && (
         <Alert 
           severity={status.type} 
-          sx={{ mb: 2 }}
           onClose={() => setStatus({ type: '', message: '' })}
         >
           {status.message}
@@ -191,7 +217,8 @@ const VideoOptimizer = () => {
           backgroundColor: isDragging ? 'action.hover' : 'background.paper',
           border: '2px dashed',
           borderColor: isDragging ? 'primary.main' : 'grey.300',
-          cursor: 'pointer'
+          cursor: 'pointer',
+          transition: 'all 0.3s ease'
         }}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
@@ -242,13 +269,14 @@ const VideoOptimizer = () => {
                     aria-label="delete"
                     onClick={handleRemoveFile}
                     startIcon={<DeleteIcon />}
+                    color="error"
                   >
                     Eliminar
                   </Button>
                 }
               >
                 <ListItemIcon>
-                  <VideoFileIcon />
+                  <VideoFileIcon color="primary" />
                 </ListItemIcon>
                 <ListItemText
                   primary={videoFile.name}
@@ -261,7 +289,7 @@ const VideoOptimizer = () => {
       </Paper>
 
       {videoFile && !processingVideo && (
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'center' }}>
           <Button
             variant="contained"
             color="primary"
@@ -279,18 +307,35 @@ const VideoOptimizer = () => {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            mt: 2,
-            gap: 1
+            gap: 2
           }}
         >
-          <CircularProgress
-            variant="determinate"
-            value={progress}
-            size={60}
-            thickness={4}
-          />
-          <Typography variant="body2" color="textSecondary">
-            {progress}% Completado
+          <Box sx={{ position: 'relative', display: 'inline-flex' }}>
+            <CircularProgress
+              variant="determinate"
+              value={progress}
+              size={60}
+              thickness={4}
+            />
+            <Box
+              sx={{
+                top: 0,
+                left: 0,
+                bottom: 0,
+                right: 0,
+                position: 'absolute',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Typography variant="caption" color="text.secondary">
+                {`${Math.round(progress)}%`}
+              </Typography>
+            </Box>
+          </Box>
+          <Typography variant="body2" color="text.secondary">
+            Procesando video...
           </Typography>
         </Box>
       )}
